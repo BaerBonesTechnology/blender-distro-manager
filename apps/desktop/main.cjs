@@ -1,5 +1,10 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, net } = require("electron");
 const path = require("node:path");
+app.setName("Blender Distro Manager");
+app.setPath(
+  "userData",
+  path.join(app.getPath("appData"), "blender-distro-manager"),
+);
 let library, window;
 app.whenReady().then(async () => {
   const { Library } = await import("../../packages/core/library.js");
@@ -28,6 +33,43 @@ app.whenReady().then(async () => {
         throw Error("Unknown sender");
       return fn(...args);
     });
+  const { catalog } = await import("../../packages/core/catalog.js");
+  handle("catalog", () => catalog);
+  const { discover } = await import("../../packages/core/releases.js");
+  const { install } = await import("../../packages/core/installer.js");
+  const releases = new Map();
+  let downloadController;
+  handle("release", async (id) => {
+    const release = await discover(id, { fetcher: net.fetch });
+    releases.set(id, release);
+    return release;
+  });
+  handle("install", async (id) => {
+    if (downloadController)
+      throw Error("An installation is already in progress.");
+    const release = releases.get(id);
+    if (!release) throw Error("Load release information first.");
+    downloadController = new AbortController();
+    let lastProgress = 0;
+    try {
+      return await install(release, library, {
+        fetcher: net.fetch,
+        signal: downloadController.signal,
+        onProgress: (progress) => {
+          const now = Date.now();
+          if (progress.phase === "Downloading" && now - lastProgress < 150)
+            return;
+          lastProgress = now;
+          if (!window.isDestroyed())
+            window.webContents.send("install-progress", { id, ...progress });
+        },
+      });
+    } finally {
+      downloadController = null;
+    }
+  });
+  handle("cancel-install", () => downloadController?.abort());
+  app.on("before-quit", () => downloadController?.abort());
   handle("library", () => library.read());
   handle("import-install", async (name) => {
     const result = await dialog.showOpenDialog(window, {

@@ -23,14 +23,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/catalog")
       return send(200, [
         ...catalog,
-        ...store
-          .public()
-          .map((s) => ({
-            ...s,
-            id: `community-${s.id}`,
-            category: "Community",
-            platforms: [],
-          })),
+        ...store.public().map((s) => ({
+          ...s,
+          id: `community-${s.id}`,
+          category: "Community",
+          platforms: [],
+        })),
       ]);
     if (req.method === "POST" && url.pathname === "/api/submissions") {
       if (
@@ -55,6 +53,7 @@ const server = http.createServer(async (req, res) => {
       "/submit": "index.html",
       "/style.css": "style.css",
       "/web.js": "web.js",
+      "/theme.js": "theme.js",
     };
     if (req.method === "GET" && assets[url.pathname])
       return send(

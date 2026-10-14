@@ -16,5 +16,9 @@
     "@playwright/test": "^1.64.1",
     "electron": "44.7.2",
     "prettier": "^3.9.10"
+  },
+  "dependencies": {
+    "tar": "^7.5.22",
+    "yauzl": "^3.4.0"
   }
 }

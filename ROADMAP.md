@@ -12,6 +12,8 @@ Implement resumable downloads with validators, bounded retry/backoff, cancel, ch
 
 ## 3. Shared add-on center
 
+Add community discovery and search in the Add-ons tab, backed by the official Blender Extensions catalog. Show descriptions, screenshots, compatibility, and update availability; install selected packages into the shared library with per-build assignments. Retain local imports.
+
 Versioned immutable package store. Parse extension manifests and legacy metadata; check Blender version ranges, platform, Python ABI, and wheels. Install wheels through Blender-supported mechanisms in separate environments. Global default collection plus per-profile pins/exclusions. Opt-in private copies for writable legacy add-ons. Track assignments and allow detach/removal. Acceptance: compatible builds share packages; incompatible builds explain the conflict; updating one profile cannot break a pinned profile.
 
 ## 4. Updates and recovery
