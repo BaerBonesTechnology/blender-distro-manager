@@ -52,3 +52,7 @@ See [ROADMAP.md](ROADMAP.md) for milestones and acceptance criteria. Product nam
 ## Manual browser and desktop smoke test
 
 With the website running, install Playwright's Chromium (`npx playwright install chromium`) and run `node tests/smoke.mjs`. Alternatively set `CHROME_EXECUTABLE` to an existing Chrome executable. This checks all website routes, submits a clearly labeled pending test entry, checks mobile overflow, and starts the Electron window. Screenshots go to `.data/`. Review/reject the generated QA entry afterward.
+
+## Standalone macOS app
+
+Run `npm run package:mac` on macOS to produce an Apple Silicon `.app` and ZIP under `dist/`. Open **Blender Distro Manager.app** directly; it includes its runtime and does not need Node.js or a terminal on the test machine. It uses the same managed-installation library as the development launcher. This local test build is ad-hoc signed, not Developer ID signed or notarized for public distribution.

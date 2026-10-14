@@ -10,9 +10,11 @@
     "start": "electron apps/desktop/main.cjs",
     "web": "node apps/web/server.js",
     "test": "node --test tests/*.test.js",
-    "review": "node apps/web/review.js"
+    "review": "node apps/web/review.js",
+    "package:mac": "node build/package-mac.mjs"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "@playwright/test": "^1.64.1",
     "electron": "44.7.2",
     "prettier": "^3.9.10"
@@ -20,5 +22,7 @@
   "dependencies": {
     "tar": "^7.5.22",
     "yauzl": "^3.4.0"
-  }
+  },
+  "main": "apps/desktop/main.cjs",
+  "productName": "Blender Distro Manager"
 }
