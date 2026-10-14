@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'"
+    />
+    <title>Blender Distro Manager</title>
+    <link rel="stylesheet" href="../web/style.css" />
+    <script src="renderer.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <strong>◈ Blender Distro Manager</strong
+      ><span class="tag">Local preview</span>
+    </header>
+    <main>
+      <div class="eyebrow">Your creative toolbox</div>
+      <h1>Make yourself at home.</h1>
+      <p>
+        Import an existing Blender build to launch it with separate settings.
+        Import trusted pure-Python legacy add-ons, then assign them to
+        compatible builds.
+      </p>
+      <div class="actions">
+        <button id="import">Import a Blender build</button
+        ><button class="secondary" id="addon">Import an add-on</button>
+      </div>
+      <label
+        >Build name<input id="name" value="My Blender" maxlength="100"
+      /></label>
+      <p id="status" class="status" role="status"></p>
+      <section class="section">
+        <h2>Your installations</h2>
+        <div id="installs" class="grid"></div>
+      </section>
+      <section class="section">
+        <h2>Shared add-on center</h2>
+        <p>
+          Assign only add-ons you have checked for compatibility. Enable them in
+          Blender’s preferences after launch. Shared files do not share
+          preferences.
+        </p>
+        <div id="addons" class="grid"></div>
+      </section>
+    </main>
+  </body>
+</html>
