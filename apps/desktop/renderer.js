@@ -79,7 +79,7 @@ async function refresh() {
                 install.id,
                 enabled,
               );
-              status.textContent = "Saved. Takes effect on next launch.";
+              status.textContent = "Saved. Applies to direct launches too.";
             } catch (e) {
               check.checked = !enabled;
               status.textContent = e.message;
@@ -91,12 +91,21 @@ async function refresh() {
         const note = document.createElement("p");
         note.className = "small";
         note.textContent =
-          "New compatible builds are enabled automatically. Changes take effect on the next launch from the manager.";
+          "New compatible builds are enabled automatically. Changes take effect on the next launch, including opening the app directly.";
         const remove = document.createElement("button");
         remove.className = "secondary";
         remove.textContent = "Uninstall add-on";
         remove.onclick = () => act(() => window.manager.removeAddon(item.id));
         card.append(menu, note, remove);
+        for (const build of state.installs) {
+          for (const report of state.nativeReports?.[build.id] || []) {
+            if (!report.addonId || report.addonId === item.id) {
+              const warning = document.createElement("p");
+              warning.textContent = `${build.name}: ${report.reason}`;
+              card.append(warning);
+            }
+          }
+        }
       }
       root.append(card);
     }

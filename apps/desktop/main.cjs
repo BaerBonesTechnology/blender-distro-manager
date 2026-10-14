@@ -94,7 +94,9 @@ app.whenReady().then(async () => {
   let detection = library.detect();
   handle("library", async () => {
     await detection;
-    return library.syncSharedAddons();
+    const state = await library.syncSharedAddons();
+    state.nativeReports = await library.syncNativeAddons();
+    return state;
   });
   handle("scan-installations", async () => {
     detection = library.detect();
@@ -114,9 +116,10 @@ app.whenReady().then(async () => {
       ]);
     }
   });
-  handle("set-addon-enabled", (addon, install, enabled) =>
-    library.setEnabled(addon, install, enabled),
-  );
+  handle("set-addon-enabled", async (addon, install, enabled) => {
+    await library.setEnabled(addon, install, enabled);
+    await library.syncNativeAddons();
+  });
   handle("remove-addon", async (id) => {
     const addon = (await library.read()).addons.find((a) => a.id === id);
     if (!addon) throw Error("Unknown add-on.");

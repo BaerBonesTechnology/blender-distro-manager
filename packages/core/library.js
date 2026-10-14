@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
+import { syncNative, nativeEnv } from "./native-integration.js";
 import { compatible } from "./extensions.js";
 import { detectInstallations } from "./detection.js";
 import { execFile, spawn } from "node:child_process";
@@ -337,10 +338,23 @@ export class Library {
       },
     };
   }
+  syncNativeAddons() {
+    const job = (this.nativeQueue || Promise.resolve()).then(() =>
+      syncNative(this),
+    );
+    this.nativeQueue = job.catch(() => {});
+    return job;
+  }
   async launch(id) {
-    const { install, script, env } = await this.prepareLaunch(id);
+    const state = await this.read();
+    const install = state.installs.find((i) => i.id === id);
+    if (!install) throw Error("Unknown installation.");
+    const reports = await this.syncNativeAddons();
+    if (reports[id]?.length)
+      throw Error(reports[id].map((r) => r.reason).join(" "));
+    const env = nativeEnv();
     return new Promise((resolve, reject) => {
-      const child = spawn(install.executable, ["--python", script], {
+      const child = spawn(install.executable, [], {
         detached: true,
         stdio: "ignore",
         env,
