@@ -38,22 +38,20 @@ async function refresh() {
         button.onclick = () => act(() => window.manager.launch(item.id));
         card.append(button);
       } else {
-        const label = document.createElement("label");
-        label.textContent = "Assign to build";
-        const select = document.createElement("select");
-        for (const install of state.installs) {
-          const option = document.createElement("option");
-          option.value = install.id;
-          option.textContent = install.name;
-          select.append(option);
+        const availability = state.availability?.[item.id];
+        const description = document.createElement("p");
+        description.textContent = availability?.available.length
+          ? `Available in ${availability.available.join(", ")}.`
+          : state.installs.length
+            ? "Not available in the current builds."
+            : "Will be available automatically when you install a compatible build.";
+        card.append(description);
+        for (const skipped of availability?.skipped || []) {
+          const note = document.createElement("p");
+          note.className = "small";
+          note.textContent = `${skipped.name}: ${skipped.reason}`;
+          card.append(note);
         }
-        label.append(select);
-        const button = document.createElement("button");
-        button.textContent = "Share add-on";
-        button.disabled = !state.installs.length;
-        button.onclick = () =>
-          act(() => window.manager.share(select.value, item.id));
-        card.append(label, document.createElement("br"), button);
       }
       root.append(card);
     }
@@ -291,7 +289,8 @@ async function searchAddons() {
         try {
           await window.manager.installCommunityAddon(entry.key);
           button.textContent = "In shared library";
-          message.textContent = "Installed. Assign it to a build below.";
+          message.textContent =
+            "Installed in the shared library. Available to compatible builds automatically.";
           await refresh();
         } catch (e) {
           message.textContent = e.message;

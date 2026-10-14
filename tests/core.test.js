@@ -94,3 +94,40 @@ test("rejects unsafe submission URLs and oversized fields", () => {
   assert.throws(() => db.submit({ ...input, name: "x".repeat(81) }), /name/);
   db.close();
 });
+
+test("shared library reaches all current and future builds without assignments", async (t) => {
+  const root = await fixture(t);
+  const library = new Library(path.join(root, "managed"));
+  const addon = path.join(root, "shared_tools");
+  await fs.mkdir(addon);
+  await fs.writeFile(path.join(addon, "__init__.py"), "# shared");
+  const saved = await library.importAddon(addon);
+  for (const name of ["first", "second"]) {
+    const executable = path.join(root, name);
+    await fs.writeFile(executable, "");
+    await library.importInstall({ name, executable });
+  }
+  let state = await library.syncSharedAddons();
+  assert.equal(state.availability[saved.id].available.length, 2);
+  state = await library.syncSharedAddons();
+  assert.equal(state.availability[saved.id].skipped.length, 0);
+  const executable = path.join(root, "future");
+  await fs.writeFile(executable, "");
+  await library.importInstall({ name: "future", executable });
+  state = await library.syncSharedAddons();
+  assert.equal(state.availability[saved.id].available.length, 3);
+  for (const install of state.installs)
+    assert.equal(
+      await fs.realpath(
+        path.join(
+          library.root,
+          "profiles",
+          install.id,
+          "scripts",
+          "addons",
+          "shared_tools",
+        ),
+      ),
+      await fs.realpath(saved.path),
+    );
+});

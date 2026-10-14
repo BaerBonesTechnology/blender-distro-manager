@@ -73,7 +73,7 @@ app.whenReady().then(async () => {
   });
   handle("cancel-install", () => downloadController?.abort());
   app.on("before-quit", () => downloadController?.abort());
-  handle("library", () => library.read());
+  handle("library", () => library.syncSharedAddons());
   handle("import-install", async (name) => {
     const result = await dialog.showOpenDialog(window, {
       title: "Select Blender executable (inside the app bundle on macOS)",
@@ -124,7 +124,6 @@ app.whenReady().then(async () => {
       addonInstalling = false;
     }
   });
-  handle("share", (install, addon) => library.share(install, addon));
   handle("launch", (id) => library.launch(id));
   window.loadFile(path.join(__dirname, "index.html"));
 });

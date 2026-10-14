@@ -8,6 +8,7 @@ export class Library {
   constructor(root) {
     this.root = path.resolve(root);
     this.queue = Promise.resolve();
+    this.syncQueue = Promise.resolve();
   }
   async read() {
     try {
@@ -80,17 +81,21 @@ export class Library {
       return item;
     });
   }
-  async share(installId, addonId) {
+  async share(
+    installId,
+    addonId,
+    { automatic = false, version: knownVersion } = {},
+  ) {
     const state = await this.read();
     const install = state.installs.find((i) => i.id === installId);
     const addon = state.addons.find((a) => a.id === addonId);
     if (!install || !addon) throw Error("Unknown installation or add-on.");
     if (addon.kind === "extension") {
-      const { stdout } = await promisify(execFile)(
-        install.executable,
-        ["--version"],
-        { timeout: 20000 },
-      );
+      const { stdout } = knownVersion
+        ? { stdout: `Blender ${knownVersion}` }
+        : await promisify(execFile)(install.executable, ["--version"], {
+            timeout: 20000,
+          });
       const version = stdout.match(
         /(?:Blender|Kitchen\s*3D)\s+(\d+\.\d+\.\d+)/i,
       )?.[1];
@@ -104,7 +109,13 @@ export class Library {
     await fs.mkdir(parent, { recursive: true });
     const dest = path.join(parent, addon.module);
     try {
-      await fs.lstat(dest);
+      const existing = await fs.lstat(dest);
+      if (
+        automatic &&
+        existing.isSymbolicLink() &&
+        (await fs.realpath(dest)) === (await fs.realpath(addon.path))
+      )
+        return { module: addon.module };
       throw Error("Add-on already assigned.");
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
@@ -116,8 +127,53 @@ export class Library {
     );
     return { module: addon.module };
   }
+  syncSharedAddons() {
+    const job = this.syncQueue.then(async () => {
+      const state = await this.read();
+      const availability = Object.fromEntries(
+        state.addons.map((a) => [a.id, { available: [], skipped: [] }]),
+      );
+      for (const install of state.installs) {
+        let version, probeError;
+        if (state.addons.some((a) => a.kind === "extension")) {
+          try {
+            const { stdout } = await promisify(execFile)(
+              install.executable,
+              ["--version"],
+              { timeout: 20000 },
+            );
+            version = stdout.match(
+              /(?:Blender|Kitchen\s*3D)\s+(\d+\.\d+\.\d+)/i,
+            )?.[1];
+            if (!version) throw Error("Could not determine Blender version.");
+          } catch (e) {
+            probeError = e.message;
+          }
+        }
+        for (const addon of state.addons) {
+          try {
+            if (addon.kind === "extension" && probeError)
+              throw Error(probeError);
+            await this.share(install.id, addon.id, {
+              automatic: true,
+              version,
+            });
+            availability[addon.id].available.push(install.name);
+          } catch (e) {
+            availability[addon.id].skipped.push({
+              name: install.name,
+              reason: e.message,
+            });
+          }
+        }
+      }
+      return { ...state, availability };
+    });
+    this.syncQueue = job.catch(() => {});
+    return job;
+  }
   async launch(id) {
-    const state = await this.read();
+    const state = await this.syncSharedAddons();
     const install = state.installs.find((i) => i.id === id);
     if (!install) throw Error("Unknown installation.");
     const profile = path.join(this.root, "profiles", id);

@@ -22,7 +22,7 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 - Three desktop tabs: Installed, Download, and Add-ons. Desktop supports system/light/dark themes; the website uses dark mode.
 - Search the official Blender Extensions community catalog by name, tags, and maintainer. Install verified extension archives into the shared library. Search shows up to 60 matches; refine the query to find more.
 - Shared library also supports local pure-Python legacy add-on folders containing `__init__.py`.
-- Explicit per-installation add-on assignment using symlinks, or directory junctions on Windows. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Enable the assigned add-on in Blender preferences after restarting Blender. Compatibility for legacy local imports remains a manual check.
+- Automatic availability across all managed installations using symlinks, or directory junctions on Windows. Synchronization runs when the library refreshes and before launch, including for newly installed builds. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Enable the shared add-on in Blender preferences after restarting Blender. Compatibility for legacy local imports remains a manual check.
 - Website hero, download availability page, distro directory, and submission form.
 - SQLite submission queue. Public responses exclude maintainer contact. A reviewer approves entries before they become visible.
 - Test-only CI across Windows, Linux, and macOS. No packaging or release workflow.
