@@ -36,22 +36,67 @@ async function refresh() {
         const button = document.createElement("button");
         button.textContent = "Launch →";
         button.onclick = () => act(() => window.manager.launch(item.id));
-        card.append(button);
+        const location = document.createElement("p");
+        location.className = "small";
+        location.textContent = `${item.external ? "Existing installation" : "Downloaded by manager"} · ${item.executable}`;
+        const remove = document.createElement("button");
+        remove.className = "secondary";
+        remove.textContent = "Uninstall";
+        remove.onclick = () =>
+          act(() => window.manager.uninstallBuild(item.id));
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        actions.append(button, remove);
+        card.append(location, actions);
       } else {
         const availability = state.availability?.[item.id];
-        const description = document.createElement("p");
-        description.textContent = availability?.available.length
-          ? `Available in ${availability.available.join(", ")}.`
-          : state.installs.length
-            ? "Not available in the current builds."
-            : "Will be available automatically when you install a compatible build.";
-        card.append(description);
-        for (const skipped of availability?.skipped || []) {
-          const note = document.createElement("p");
-          note.className = "small";
-          note.textContent = `${skipped.name}: ${skipped.reason}`;
-          card.append(note);
+        const menu = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = "Enabled in";
+        menu.append(summary);
+        for (const install of state.installs) {
+          const problem = availability?.skipped.find(
+            (s) => s.name === install.name,
+          );
+          const label = document.createElement("label");
+          label.className = "check-row";
+          const check = document.createElement("input");
+          check.type = "checkbox";
+          check.checked = !problem && !item.disabledIn?.includes(install.id);
+          check.disabled = !!problem;
+          const text = document.createElement("span");
+          text.textContent =
+            install.name + (problem ? " — " + problem.reason : "");
+          label.append(check, text);
+          menu.append(label);
+          check.onchange = async () => {
+            const enabled = check.checked;
+            check.disabled = true;
+            status.textContent = "Saving…";
+            try {
+              await window.manager.setAddonEnabled(
+                item.id,
+                install.id,
+                enabled,
+              );
+              status.textContent = "Saved. Takes effect on next launch.";
+            } catch (e) {
+              check.checked = !enabled;
+              status.textContent = e.message;
+            } finally {
+              check.disabled = false;
+            }
+          };
         }
+        const note = document.createElement("p");
+        note.className = "small";
+        note.textContent =
+          "New compatible builds are enabled automatically. Changes take effect on the next launch from the manager.";
+        const remove = document.createElement("button");
+        remove.className = "secondary";
+        remove.textContent = "Uninstall add-on";
+        remove.onclick = () => act(() => window.manager.removeAddon(item.id));
+        card.append(menu, note, remove);
       }
       root.append(card);
     }
@@ -316,3 +361,8 @@ document.querySelector("#addon-search").onsubmit = (e) => {
 document.querySelector("#tab-addons").addEventListener("click", () => {
   if (!addonSearchSequence) void searchAddons();
 });
+
+document.querySelector("#scan-builds").onclick = () =>
+  act(() => window.manager.scanInstallations());
+document.querySelector("#locate-build").onclick = () =>
+  act(() => window.manager.locateInstallation());

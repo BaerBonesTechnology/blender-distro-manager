@@ -22,7 +22,7 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 - Three desktop tabs: Installed, Download, and Add-ons. Desktop supports system/light/dark themes; the website uses dark mode.
 - Search the official Blender Extensions community catalog by name, tags, and maintainer. Install verified extension archives into the shared library. Search shows up to 60 matches; refine the query to find more.
 - Shared library also supports local pure-Python legacy add-on folders containing `__init__.py`.
-- Automatic availability across all managed installations using symlinks, or directory junctions on Windows. Synchronization runs when the library refreshes and before launch, including for newly installed builds. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Enable the shared add-on in Blender preferences after restarting Blender. Compatibility for legacy local imports remains a manual check.
+- Automatic availability across all managed installations using symlinks, or directory junctions on Windows. Synchronization runs when the library refreshes and before launch, including for newly installed builds. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Shared add-ons are automatically enabled on launch from the manager. Each add-on has an Enabled in checklist for persistent per-build exclusions; future compatible builds default to enabled. Restart open builds after changes. Compatibility for legacy local imports remains a manual check.
 - Website hero, download availability page, distro directory, and submission form.
 - SQLite submission queue. Public responses exclude maintainer contact. A reviewer approves entries before they become visible.
 - Test-only CI across Windows, Linux, and macOS. No packaging or release workflow.
@@ -57,3 +57,9 @@ With the website running, install Playwright's Chromium (`npx playwright install
 ## Standalone macOS app
 
 Run `npm run package:mac` on macOS to produce an Apple Silicon `.app` and ZIP under `dist/`. Open **Blender Distro Manager.app** directly; it includes its runtime and does not need Node.js or a terminal on the test machine. It uses the same managed-installation library as the development launcher. This local test build is ad-hoc signed, not Developer ID signed or notarized for public distribution.
+
+## Existing installations and uninstall
+
+The manager scans standard installation locations at startup. On macOS it also detects local Blender/Kitchen build outputs under Documents/Projects. Use Scan installed builds to rescan or Locate existing installation for custom locations. Existing applications are adopted in place. Their native preferences are copied into an isolated manager profile on first launch; the original preferences remain untouched. Launches outside the manager retain their existing behavior.
+
+Uninstall controls confirm the exact application path before moving the application/build to Trash and removing its manager profile. Close the build first. System executables without an isolated application folder must be removed with the OS package manager; the UI explains when it can only remove the manager entry. Uninstalling a shared add-on deletes its library copy and profile links, leaving the original local import source untouched.

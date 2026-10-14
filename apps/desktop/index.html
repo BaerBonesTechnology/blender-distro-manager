@@ -52,6 +52,13 @@
       <section id="installed" role="tabpanel" aria-labelledby="tab-installed">
         <h1>Installed</h1>
         <p>Manage your Blender installations.</p>
+        <div class="actions">
+          <button id="scan-builds" class="secondary">
+            Scan installed builds</button
+          ><button id="locate-build" class="secondary">
+            Locate existing installation
+          </button>
+        </div>
         <div id="installs" class="grid"></div>
       </section>
       <section
@@ -91,9 +98,9 @@
         <div id="addon-results" class="grid"></div>
         <h2>Shared library</h2>
         <p>
-          Add-ons are automatically available in every compatible installation,
-          including new builds you install later. Restart an open Blender
-          instance to see newly added add-ons, then enable them in Preferences.
+          Add-ons are enabled automatically in every compatible build launched
+          from this manager. Use “Enabled in” to turn them off for individual
+          builds. Restart a running build for changes to take effect.
         </p>
         <div class="actions">
           <button id="addon" class="secondary">Import local add-on</button>

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, dialog, net } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, net, shell } = require("electron");
 const path = require("node:path");
 app.setName("Blender Distro Manager");
 app.setPath(
   "userData",
-  path.join(app.getPath("appData"), "blender-distro-manager"),
+  (!app.isPackaged && process.env.BDM_DATA_DIR) ||
+    path.join(app.getPath("appData"), "blender-distro-manager"),
 );
 let library, window;
 app.whenReady().then(async () => {
@@ -51,6 +52,23 @@ app.whenReady().then(async () => {
     const selected = releases.get(url);
     if (!selected || selected.id !== id)
       throw Error("Select a release from the list first.");
+    await detection;
+    const existing = (await library.read()).installs.filter(
+      (i) => i.external && i.distro === id,
+    );
+    if (existing.length) {
+      const choice = await dialog.showMessageBox(window, {
+        type: "question",
+        buttons: ["Use existing installation", "Install another copy"],
+        defaultId: 0,
+        cancelId: 0,
+        message: `${existing.map((i) => i.name).join(", ")} is already installed.`,
+        detail:
+          "It is available in Installed. Only continue if you want another side-by-side version.",
+      });
+      if (choice.response !== 1)
+        throw Error("Use your existing build in Installed.");
+    }
     downloadController = new AbortController();
     let lastProgress = 0;
     try {
@@ -73,7 +91,65 @@ app.whenReady().then(async () => {
   });
   handle("cancel-install", () => downloadController?.abort());
   app.on("before-quit", () => downloadController?.abort());
-  handle("library", () => library.syncSharedAddons());
+  let detection = library.detect();
+  handle("library", async () => {
+    await detection;
+    return library.syncSharedAddons();
+  });
+  handle("scan-installations", async () => {
+    detection = library.detect();
+    return detection;
+  });
+  handle("locate-installation", async () => {
+    const choice = await dialog.showOpenDialog(window, {
+      title: "Locate an existing Blender or Kitchen 3D installation",
+      properties: ["openDirectory"],
+    });
+    if (!choice.canceled) {
+      const path = require("node:path");
+      await library.detect([
+        choice.filePaths[0].endsWith(".app")
+          ? path.dirname(choice.filePaths[0])
+          : choice.filePaths[0],
+      ]);
+    }
+  });
+  handle("set-addon-enabled", (addon, install, enabled) =>
+    library.setEnabled(addon, install, enabled),
+  );
+  handle("remove-addon", async (id) => {
+    const addon = (await library.read()).addons.find((a) => a.id === id);
+    if (!addon) throw Error("Unknown add-on.");
+    const response = await dialog.showMessageBox(window, {
+      type: "question",
+      buttons: ["Cancel", "Uninstall"],
+      defaultId: 0,
+      cancelId: 0,
+      message: `Uninstall ${addon.name || addon.module}?`,
+      detail:
+        "Removes this add-on from the shared library and all managed profiles. Close running Blender instances first.",
+    });
+    if (response.response === 1) await library.removeAddon(id);
+  });
+  handle("uninstall-build", async (id) => {
+    const install = (await library.read()).installs.find((i) => i.id === id);
+    if (!install) throw Error("Unknown installation.");
+    const target = await library.uninstallTarget(id);
+    const response = await dialog.showMessageBox(window, {
+      type: "question",
+      buttons: ["Cancel", target ? "Uninstall" : "Remove from manager"],
+      defaultId: 0,
+      cancelId: 0,
+      message: `${target ? "Uninstall" : "Remove"} ${install.name}?`,
+      detail: target
+        ? `Move ${target} to Trash and remove its manager profile. Close this build first. Project files and original user preferences outside the installation are preserved.`
+        : "This system-managed executable must be uninstalled using your OS package manager. This removes its manager profile only.",
+    });
+    if (response.response === 1) {
+      if (target) await shell.trashItem(target);
+      await library.forgetInstall(id);
+    }
+  });
   handle("import-install", async (name) => {
     const result = await dialog.showOpenDialog(window, {
       title: "Select Blender executable (inside the app bundle on macOS)",

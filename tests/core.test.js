@@ -131,3 +131,64 @@ test("shared library reaches all current and future builds without assignments",
       await fs.realpath(saved.path),
     );
 });
+
+test("per-build enable exceptions persist and new builds default to enabled", async (t) => {
+  const root = await fixture(t);
+  const library = new Library(path.join(root, "managed"));
+  const addon = path.join(root, "shared_tools");
+  await fs.mkdir(addon);
+  await fs.writeFile(path.join(addon, "__init__.py"), "# shared");
+  const saved = await library.importAddon(addon);
+  const executable = path.join(root, "blender");
+  await fs.writeFile(executable, "");
+  const first = await library.importInstall({ name: "first", executable });
+  await library.setEnabled(saved.id, first.id, false);
+  const prepared = await library.prepareLaunch(first.id);
+  const script = await fs.readFile(prepared.script, "utf8");
+  assert.match(script, /enabled = json.loads\("\[\]"\)/);
+  const secondExe = path.join(root, "second");
+  await fs.writeFile(secondExe, "");
+  const second = await library.importInstall({
+    name: "second",
+    executable: secondExe,
+  });
+  const secondLaunch = await library.prepareLaunch(second.id);
+  assert.match(
+    await fs.readFile(secondLaunch.script, "utf8"),
+    /enabled = .*shared_tools/,
+  );
+  await library.setEnabled(saved.id, first.id, true);
+  assert.deepEqual((await library.read()).addons[0].disabledIn, []);
+});
+test("uninstall addon removes only owned copy and links; build target stays bounded", async (t) => {
+  const root = await fixture(t);
+  const library = new Library(path.join(root, "managed"));
+  const addon = path.join(root, "local_tools");
+  await fs.mkdir(addon);
+  await fs.writeFile(path.join(addon, "__init__.py"), "# preserved");
+  const saved = await library.importAddon(addon);
+  const exe = path.join(root, "blender");
+  await fs.writeFile(exe, "");
+  const build = await library.importInstall({ name: "test", executable: exe });
+  await library.syncSharedAddons();
+  await assert.rejects(library.uninstallTarget(build.id), /Unmanaged/);
+  await library.removeAddon(saved.id);
+  assert.equal((await library.read()).addons.length, 0);
+  assert.equal(
+    await fs.readFile(path.join(addon, "__init__.py"), "utf8"),
+    "# preserved",
+  );
+  await assert.rejects(fs.access(saved.path));
+  await assert.rejects(
+    fs.access(
+      path.join(
+        library.root,
+        "profiles",
+        build.id,
+        "scripts",
+        "addons",
+        "local_tools",
+      ),
+    ),
+  );
+});

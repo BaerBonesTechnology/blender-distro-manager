@@ -286,3 +286,21 @@ form textarea {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+.check-row input {
+  width: auto;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 0;
+}
+details {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}

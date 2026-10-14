@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { compatible } from "./extensions.js";
+import { detectInstallations } from "./detection.js";
 import { execFile, spawn } from "node:child_process";
 export class Library {
   constructor(root) {
@@ -172,28 +173,177 @@ export class Library {
     this.syncQueue = job.catch(() => {});
     return job;
   }
-  async launch(id) {
+  async detect(roots) {
+    const candidates = await detectInstallations(roots);
+    return this.update((state) => {
+      for (const candidate of candidates) {
+        if (
+          state.installs.some((i) => i.executable === candidate.executable) ||
+          (state.ignoredExecutables || []).includes(candidate.executable)
+        )
+          continue;
+        state.installs.push({ ...candidate, id: randomUUID() });
+      }
+      return candidates.length;
+    });
+  }
+  async setEnabled(addonId, installId, enabled) {
+    if (typeof enabled !== "boolean") throw Error("Invalid enabled state.");
+    await this.update((state) => {
+      const addon = state.addons.find((a) => a.id === addonId);
+      if (!addon || !state.installs.some((i) => i.id === installId))
+        throw Error("Unknown add-on or build.");
+      addon.disabledIn ||= [];
+      addon.disabledIn = addon.disabledIn.filter((id) => id !== installId);
+      if (!enabled) addon.disabledIn.push(installId);
+    });
+  }
+  async removeAddon(id) {
+    const state = await this.read();
+    const addon = state.addons.find((a) => a.id === id);
+    if (!addon) throw Error("Unknown add-on.");
+    for (const install of state.installs) {
+      const dest = path.join(
+        this.root,
+        "profiles",
+        install.id,
+        ...(addon.kind === "extension"
+          ? ["extensions", "system"]
+          : ["scripts", "addons"]),
+        addon.module,
+      );
+      try {
+        if (
+          (await fs.lstat(dest)).isSymbolicLink() &&
+          (await fs.realpath(dest)) === (await fs.realpath(addon.path))
+        )
+          await fs.unlink(dest);
+      } catch (e) {
+        if (e.code !== "ENOENT") throw e;
+      }
+    }
+    const owned = path.resolve(addon.path);
+    if (
+      ![
+        path.join(this.root, "addons") + path.sep,
+        path.join(this.root, "extensions") + path.sep,
+      ].some((prefix) => owned.startsWith(prefix))
+    )
+      throw Error("Refusing to remove an unmanaged add-on folder.");
+    await fs.rm(owned, { recursive: true, force: true });
+    await this.update((s) => {
+      s.addons = s.addons.filter((a) => a.id !== id);
+    });
+  }
+  async uninstallTarget(id) {
+    const state = await this.read();
+    const install = state.installs.find((i) => i.id === id);
+    if (!install) throw Error("Unknown installation.");
+    if (install.external) return install.uninstallPath;
+    const parent = path.join(this.root, "installations");
+    const relative = path.relative(parent, install.executable);
+    if (
+      relative.startsWith("..") ||
+      path.isAbsolute(relative) ||
+      relative.split(path.sep).length < 2
+    )
+      throw Error("Unmanaged installation path.");
+    return path.join(parent, relative.split(path.sep)[0]);
+  }
+  async forgetInstall(id) {
+    await this.update((state) => {
+      const install = state.installs.find((i) => i.id === id);
+      if (!install) throw Error("Unknown installation.");
+      state.ignoredExecutables ||= [];
+      state.ignoredExecutables.push(install.executable);
+      state.installs = state.installs.filter((i) => i.id !== id);
+      for (const a of state.addons)
+        a.disabledIn = a.disabledIn?.filter((i) => i !== id);
+    });
+    await fs.rm(path.join(this.root, "profiles", id), {
+      recursive: true,
+      force: true,
+    });
+  }
+  async prepareLaunch(id) {
     const state = await this.syncSharedAddons();
     const install = state.installs.find((i) => i.id === id);
     if (!install) throw Error("Unknown installation.");
     const profile = path.join(this.root, "profiles", id);
-    await fs.mkdir(path.join(profile, "config"), { recursive: true });
+    const config = path.join(profile, "config");
+    if (install.external) {
+      try {
+        await fs.access(path.join(profile, "preferences-adopted"));
+      } catch {
+        // Ask the executable for its native config location, preserving distro-specific paths.
+        const { stdout } = await promisify(execFile)(
+          install.executable,
+          [
+            "--background",
+            "--factory-startup",
+            "--python-expr",
+            'import bpy; print("BDM_CONFIG=" + bpy.utils.user_resource("CONFIG"))',
+          ],
+          { timeout: 60000 },
+        );
+        const native = stdout.match(/^BDM_CONFIG=(.+)$/m)?.[1]?.trim();
+        if (native && path.resolve(native) !== path.resolve(config)) {
+          try {
+            await fs.cp(native, config, {
+              recursive: true,
+              force: false,
+              errorOnExist: false,
+            });
+          } catch (e) {
+            if (e.code !== "ENOENT") throw e;
+          }
+        }
+        await fs.mkdir(config, { recursive: true });
+        await fs.writeFile(path.join(profile, "preferences-adopted"), "1");
+      }
+    }
+    await fs.mkdir(config, { recursive: true });
     await fs.mkdir(path.join(profile, "scripts", "addons"), {
       recursive: true,
     });
     await fs.mkdir(path.join(profile, "extensions", "system"), {
       recursive: true,
     });
+    const enabled = state.addons
+      .filter(
+        (a) =>
+          state.availability[a.id].available.includes(install.name) &&
+          !a.disabledIn?.includes(id),
+      )
+      .map((a) =>
+        a.kind === "extension" ? "bl_ext.system." + a.module : a.module,
+      );
+    const all = state.addons.map((a) =>
+      a.kind === "extension" ? "bl_ext.system." + a.module : a.module,
+    );
+    const script = path.join(profile, "shared-addons.py");
+    await fs.writeFile(
+      script,
+      `import addon_utils, bpy, json\nfrom bpy.app.handlers import persistent\nenabled = json.loads(${JSON.stringify(JSON.stringify(enabled))})\nmanaged = json.loads(${JSON.stringify(JSON.stringify(all))})\n@persistent\ndef apply_shared_addons(*args):\n    for module in managed:\n        try:\n            if module in enabled:\n                if not addon_utils.check(module)[1]:\n                    addon_utils.enable(module, default_set=True, persistent=True)\n            elif addon_utils.check(module)[1]:\n                addon_utils.disable(module, default_set=True)\n        except Exception as exc:\n            print('Shared add-on failed:', module, exc)\napply_shared_addons()\nbpy.app.handlers.load_post.append(apply_shared_addons)\n`,
+    );
+    return {
+      install,
+      script,
+      env: {
+        ...process.env,
+        BLENDER_USER_CONFIG: config,
+        BLENDER_SYSTEM_EXTENSIONS: path.join(profile, "extensions"),
+        BLENDER_USER_SCRIPTS: path.join(profile, "scripts"),
+      },
+    };
+  }
+  async launch(id) {
+    const { install, script, env } = await this.prepareLaunch(id);
     return new Promise((resolve, reject) => {
-      const child = spawn(install.executable, [], {
+      const child = spawn(install.executable, ["--python", script], {
         detached: true,
         stdio: "ignore",
-        env: {
-          ...process.env,
-          BLENDER_USER_CONFIG: path.join(profile, "config"),
-          BLENDER_SYSTEM_EXTENSIONS: path.join(profile, "extensions"),
-          BLENDER_USER_SCRIPTS: path.join(profile, "scripts"),
-        },
+        env,
       });
       child.once("error", reject);
       child.once("spawn", () => {
