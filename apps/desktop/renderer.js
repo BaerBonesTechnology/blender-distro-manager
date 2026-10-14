@@ -9,10 +9,6 @@ async function act(fn) {
     status.textContent = e.message;
   }
 }
-document.querySelector("#import").onclick = () =>
-  act(() =>
-    window.manager.importInstall(document.querySelector("#name").value),
-  );
 document.querySelector("#addon").onclick = () =>
   act(() => window.manager.importAddon());
 async function refresh() {
@@ -23,14 +19,19 @@ async function refresh() {
     if (!state[key].length)
       root.textContent =
         key === "installs"
-          ? "No builds imported yet."
-          : "No add-ons imported yet.";
+          ? "No builds installed yet. Choose a build in Download to get started."
+          : "No add-ons in your shared library yet.";
     for (const item of state[key]) {
       const card = document.createElement("article");
       card.className = "card";
       const title = document.createElement("h3");
       title.textContent = item.name || item.module;
       card.append(title);
+      if (item.version && key === "addons") {
+        const version = document.createElement("p");
+        version.textContent = `Version ${item.version} · Blender ${item.manifest?.blender_version_min || "unknown"}+`;
+        card.append(version);
+      }
       if (key === "installs") {
         const button = document.createElement("button");
         button.textContent = "Launch →";
@@ -234,3 +235,85 @@ window.manager
     }
   })
   .catch((e) => (status.textContent = e.message));
+
+let addonSearchSequence = 0;
+let addonBusy = false;
+async function searchAddons() {
+  const sequence = ++addonSearchSequence;
+  const output = document.querySelector("#addon-results");
+  const summary = document.querySelector("#addon-search-status");
+  summary.textContent = "Searching Blender Extensions…";
+  try {
+    const result = await window.manager.searchAddons(
+      document.querySelector("#addon-query").value,
+    );
+    if (sequence !== addonSearchSequence) return;
+    const library = await window.manager.read();
+    output.replaceChildren();
+    summary.textContent = result.total
+      ? `${result.total} add-ons found${result.total > 60 ? " · Showing the first 60. Refine your search for more." : ""}`
+      : "No matching add-ons.";
+    for (const entry of result.items) {
+      const card = document.createElement("article");
+      card.className = "card";
+      const title = document.createElement("h3");
+      title.textContent = entry.name;
+      const text = document.createElement("p");
+      text.textContent = entry.tagline;
+      const info = document.createElement("p");
+      info.className = "small";
+      info.textContent = `${entry.version} · ${entry.maintainer} · Blender ${entry.blender_version_min}+${entry.blender_version_max ? " (before " + entry.blender_version_max + ")" : ""}`;
+      const permissions = document.createElement("p");
+      permissions.className = "small";
+      permissions.textContent = entry.permissions
+        ? Object.entries(entry.permissions)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(" · ")
+        : "";
+      const button = document.createElement("button");
+      const installed = library.addons.some(
+        (a) => a.archiveHash === entry.archive_hash,
+      );
+      button.textContent = installed
+        ? "In shared library"
+        : "Install to library";
+      button.disabled = installed;
+      const message = document.createElement("p");
+      message.setAttribute("role", "status");
+      button.onclick = async () => {
+        if (addonBusy) {
+          message.textContent = "Wait for the current add-on installation.";
+          return;
+        }
+        addonBusy = true;
+        button.disabled = true;
+        message.textContent = "Downloading and verifying…";
+        try {
+          await window.manager.installCommunityAddon(entry.key);
+          button.textContent = "In shared library";
+          message.textContent = "Installed. Assign it to a build below.";
+          await refresh();
+        } catch (e) {
+          message.textContent = e.message;
+          button.disabled = false;
+        } finally {
+          addonBusy = false;
+        }
+      };
+      card.append(title, text, info, permissions, button, message);
+      output.append(card);
+    }
+  } catch (e) {
+    if (sequence === addonSearchSequence) {
+      output.replaceChildren();
+      summary.textContent = e.message;
+    }
+  }
+}
+document.querySelector("#addon-search").onsubmit = (e) => {
+  e.preventDefault();
+  void searchAddons();
+};
+document.querySelector("#tab-addons").addEventListener("click", () => {
+  if (!addonSearchSequence) void searchAddons();
+});

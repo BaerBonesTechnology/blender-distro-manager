@@ -89,6 +89,41 @@ app.whenReady().then(async () => {
     });
     if (!result.canceled) return library.importAddon(result.filePaths[0]);
   });
+  const { fetchCatalog, installExtension } =
+    await import("../../packages/core/extensions.js");
+  let extensionCatalog = [],
+    catalogTime = 0;
+  handle("search-addons", async (query) => {
+    if (typeof query !== "string" || query.length > 200)
+      throw Error("Invalid search.");
+    if (Date.now() - catalogTime > 5 * 60 * 1000) {
+      extensionCatalog = await fetchCatalog(net.fetch);
+      catalogTime = Date.now();
+    }
+    const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const matches = extensionCatalog.filter((a) =>
+      terms.every((term) =>
+        [a.name, a.tagline, a.maintainer, ...(a.tags || [])]
+          .join(" ")
+          .toLowerCase()
+          .includes(term),
+      ),
+    );
+    return { total: matches.length, items: matches.slice(0, 60) };
+  });
+  let addonInstalling = false;
+  handle("install-community-addon", async (key) => {
+    if (addonInstalling)
+      throw Error("An add-on installation is already in progress.");
+    const entry = extensionCatalog.find((a) => a.key === key);
+    if (!entry) throw Error("Search for this add-on again.");
+    addonInstalling = true;
+    try {
+      return await installExtension(entry, library, net.fetch);
+    } finally {
+      addonInstalling = false;
+    }
+  });
   handle("share", (install, addon) => library.share(install, addon));
   handle("launch", (id) => library.launch(id));
   window.loadFile(path.join(__dirname, "index.html"));

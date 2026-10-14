@@ -35,7 +35,7 @@ const app = await _electron.launch({
   cwd: process.cwd(),
 });
 const win = await app.firstWindow();
-await win.getByText("No builds imported yet.").waitFor();
+await win.getByText("No builds installed yet. Choose a build in Download to get started.").waitFor();
 await win.screenshot({ path: ".data/desktop-preview.png" });
 await app.close();
 if (errors.length) throw Error(errors.join("\n"));

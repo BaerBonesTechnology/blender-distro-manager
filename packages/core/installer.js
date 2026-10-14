@@ -7,6 +7,7 @@ import { Readable, Transform } from "node:stream";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import yauzl from "yauzl";
+import lzma from "lzma";
 import * as tar from "tar";
 const exec = promisify(execFile);
 export function safePath(name) {
@@ -49,9 +50,43 @@ export async function unzip(file, dest) {
           await fs.mkdir(target, { recursive: true });
           return;
         }
-        const stream = await new Promise((resolve, reject) =>
-          zip.openReadStream(entry, (e, s) => (e ? reject(e) : resolve(s))),
+        if (entry.isEncrypted())
+          throw Error("Encrypted archives are not supported.");
+        let stream = await new Promise((resolve, reject) =>
+          zip.openReadStream(
+            entry,
+            entry.compressionMethod === 14 ? { decodeFileData: false } : {},
+            (e, s) => (e ? reject(e) : resolve(s)),
+          ),
         );
+        if (entry.compressionMethod === 14) {
+          if (
+            entry.compressedSize > 64 * 1024 ** 2 ||
+            entry.uncompressedSize > 64 * 1024 ** 2
+          )
+            throw Error("LZMA add-on file exceeds 64 MB.");
+          const chunks = [];
+          for await (const chunk of stream) chunks.push(chunk);
+          const data = Buffer.concat(chunks);
+          if (
+            data.length < 9 ||
+            data.readUInt16LE(2) !== 5 ||
+            data.readUInt32LE(5) > 64 * 1024 ** 2
+          )
+            throw Error("Unsupported LZMA properties.");
+          const size = Buffer.alloc(8);
+          size.writeBigUInt64LE(BigInt(entry.uncompressedSize));
+          const decoded = await new Promise((resolve, reject) =>
+            lzma.decompress(
+              Buffer.concat([data.subarray(4, 9), size, data.subarray(9)]),
+              (value, error) => (error ? reject(error) : resolve(value)),
+            ),
+          );
+          const buffer = Buffer.from(decoded);
+          if (buffer.length !== entry.uncompressedSize)
+            throw Error("Incorrect LZMA file size.");
+          stream = Readable.from([buffer]);
+        }
         if (type === 0xa000) {
           let value = "";
           for await (const chunk of stream) {

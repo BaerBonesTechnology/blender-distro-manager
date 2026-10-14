@@ -52,14 +52,6 @@
       <section id="installed" role="tabpanel" aria-labelledby="tab-installed">
         <h1>Installed</h1>
         <p>Manage your Blender installations.</p>
-        <div class="toolbar">
-          <label
-            >Build name<input
-              id="name"
-              value="My Blender"
-              maxlength="100" /></label
-          ><button id="import">Import existing build</button>
-        </div>
         <div id="installs" class="grid"></div>
       </section>
       <section
@@ -83,10 +75,30 @@
       >
         <h1>Add-ons</h1>
         <p>
-          Import a trusted pure-Python legacy add-on and assign it to a
-          compatible build. Enable it in Blender’s preferences.
+          Search community add-ons from Blender Extensions and install them into
+          your shared library.
         </p>
-        <div class="actions"><button id="addon">Import add-on</button></div>
+        <form id="addon-search" class="addon-search">
+          <label
+            >Search community add-ons<input
+              id="addon-query"
+              type="search"
+              placeholder="Name, category, or maintainer"
+              maxlength="200" /></label
+          ><button>Search</button>
+        </form>
+        <p id="addon-search-status" role="status"></p>
+        <div id="addon-results" class="grid"></div>
+        <h2>Shared library</h2>
+        <p>
+          Assign an add-on to a compatible build, then enable it in Blender’s
+          Preferences. Restart Blender after assigning. Packages with Python
+          dependencies can be stored here, but sharing those dependencies is not
+          supported yet.
+        </p>
+        <div class="actions">
+          <button id="addon" class="secondary">Import local add-on</button>
+        </div>
         <div id="addons" class="grid"></div>
       </section>
     </main>

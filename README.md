@@ -20,8 +20,9 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 - Desktop import and launch of existing installations with separate configuration and scripts directories.
 - Choose and install Blender stable releases (3.x onward), including previous versions, or available official Beta/Alpha daily builds. Kitchen 3D offers its published release history with channel filters. Only packages matching this computer are listed. Kitchen 3D pre-releases are labeled. Downloads verify published SHA-256 checksums, retry up to three times, and install side by side. Cancel stops downloads; extraction finishes before cancellation cleanup.
 - Three desktop tabs: Installed, Download, and Add-ons. Desktop supports system/light/dark themes; the website uses dark mode.
-- Shared library for pure-Python legacy add-on folders containing `__init__.py`.
-- Explicit per-installation add-on assignment using symlinks, or directory junctions on Windows. Enable the assigned add-on in Blender preferences. Compatibility is currently a manual check.
+- Search the official Blender Extensions community catalog by name, tags, and maintainer. Install verified extension archives into the shared library. Search shows up to 60 matches; refine the query to find more.
+- Shared library also supports local pure-Python legacy add-on folders containing `__init__.py`.
+- Explicit per-installation add-on assignment using symlinks, or directory junctions on Windows. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Enable the assigned add-on in Blender preferences after restarting Blender. Compatibility for legacy local imports remains a manual check.
 - Website hero, download availability page, distro directory, and submission form.
 - SQLite submission queue. Public responses exclude maintainer contact. A reviewer approves entries before they become visible.
 - Test-only CI across Windows, Linux, and macOS. No packaging or release workflow.
@@ -36,7 +37,7 @@ Start the website once before using the review CLI. Website data defaults to `.d
 
 ## Prototype boundaries
 
-No public installers exist yet: the download page says so. Update notifications, rollback controls, resumable downloads, add-on compatibility detection, extension manifests/wheels, and maintainer authentication are planned. Linux tar.xz installation requires `xz` on PATH. macOS disk images use the built-in `hdiutil` and `ditto` tools. Unsupported OS/architecture combinations show an availability message. Shared add-ons must not write into their own source folder; writable legacy add-ons need a future private-copy mode. Profiles isolate preferences, not the execution of untrusted Python code.
+No public installers exist yet: the download page says so. Update notifications, rollback controls, resumable downloads, wheel dependency installation, and maintainer authentication are planned. Linux tar.xz installation requires `xz` on PATH. macOS disk images use the built-in `hdiutil` and `ditto` tools. Unsupported OS/architecture combinations show an availability message. Shared add-ons must not write into their own source folder; writable legacy add-ons need a future private-copy mode. Profiles isolate preferences, not the execution of untrusted Python code.
 
 The website binds to localhost. Do not expose it publicly yet: deployment requires authentication for maintainer tools, rate limiting, spam controls, abuse reporting, ownership verification, and operational hardening. Current catalog approval is editorial review, not a security audit. Source links lead to maintainers; binaries are not mirrored here.
 

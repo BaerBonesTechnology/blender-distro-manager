@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("manager", {
+  searchAddons: (query) => ipcRenderer.invoke("search-addons", query),
+  installCommunityAddon: (key) =>
+    ipcRenderer.invoke("install-community-addon", key),
   catalog: () => ipcRenderer.invoke("catalog"),
   releases: (id, channel) => ipcRenderer.invoke("releases", id, channel),
   install: (id, url) => ipcRenderer.invoke("install", id, url),

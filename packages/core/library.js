@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { promisify } from "node:util";
+import { compatible } from "./extensions.js";
+import { execFile, spawn } from "node:child_process";
 export class Library {
   constructor(root) {
     this.root = path.resolve(root);
@@ -83,13 +85,22 @@ export class Library {
     const install = state.installs.find((i) => i.id === installId);
     const addon = state.addons.find((a) => a.id === addonId);
     if (!install || !addon) throw Error("Unknown installation or add-on.");
-    const parent = path.join(
-      this.root,
-      "profiles",
-      install.id,
-      "scripts",
-      "addons",
-    );
+    if (addon.kind === "extension") {
+      const { stdout } = await promisify(execFile)(
+        install.executable,
+        ["--version"],
+        { timeout: 20000 },
+      );
+      const version = stdout.match(
+        /(?:Blender|Kitchen\s*3D)\s+(\d+\.\d+\.\d+)/i,
+      )?.[1];
+      const problem = compatible(addon.manifest, version);
+      if (problem) throw Error(problem);
+    }
+    const parent =
+      addon.kind === "extension"
+        ? path.join(this.root, "profiles", install.id, "extensions", "system")
+        : path.join(this.root, "profiles", install.id, "scripts", "addons");
     await fs.mkdir(parent, { recursive: true });
     const dest = path.join(parent, addon.module);
     try {
@@ -114,6 +125,9 @@ export class Library {
     await fs.mkdir(path.join(profile, "scripts", "addons"), {
       recursive: true,
     });
+    await fs.mkdir(path.join(profile, "extensions", "system"), {
+      recursive: true,
+    });
     return new Promise((resolve, reject) => {
       const child = spawn(install.executable, [], {
         detached: true,
@@ -121,6 +135,7 @@ export class Library {
         env: {
           ...process.env,
           BLENDER_USER_CONFIG: path.join(profile, "config"),
+          BLENDER_SYSTEM_EXTENSIONS: path.join(profile, "extensions"),
           BLENDER_USER_SCRIPTS: path.join(profile, "scripts"),
         },
       });
