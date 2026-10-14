@@ -1,0 +1,66 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    name: Test and package (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: macOS-arm64
+          - os: windows-2022
+            target: Windows-x64
+          - os: ubuntu-22.04
+            target: Linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Check release version
+        shell: bash
+        run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./package.json").version) throw Error("Tag must match package.json version")'
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/Blender-Distro-Manager-*.zip
+            dist/Blender-Distro-Manager-*.tar.gz
+            dist/Blender-Distro-Manager-*.sha256
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --prerelease --title "Blender Distro Manager $GITHUB_REF_NAME" --notes-file build/RELEASE_NOTES.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease

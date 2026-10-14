@@ -48,6 +48,11 @@ async function refresh() {
         actions.className = "actions";
         actions.append(button, remove);
         card.append(location, actions);
+        for (const message of state.applicationReports?.[item.id] || []) {
+          const warning = document.createElement("p");
+          warning.textContent = message;
+          card.append(warning);
+        }
       } else {
         const availability = state.availability?.[item.id];
         const menu = document.createElement("details");

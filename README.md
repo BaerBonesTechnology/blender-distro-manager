@@ -25,7 +25,7 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 - Automatic availability across all managed installations using symlinks, or directory junctions on Windows. Synchronization runs when the library refreshes and before launch, including for newly installed builds. Community extensions use the system extension repository, with version and platform checks against the actual Blender executable. Shared add-ons are linked into each build’s normal user scripts/extension folders and automatically enabled on direct launches too. A small Blender startup module reads the saved per-executable checklist; the manager does not need to be running. Each add-on has an Enabled in checklist for persistent per-build exclusions; future compatible builds default to enabled. Restart open builds after changes. Compatibility for legacy local imports remains a manual check.
 - Website hero, download availability page, distro directory, and submission form.
 - SQLite submission queue. Public responses exclude maintainer contact. A reviewer approves entries before they become visible.
-- Test-only CI across Windows, Linux, and macOS. No packaging or release workflow.
+- Test-only CI for normal pushes and pull requests across Windows, Linux, and macOS. Version tags build and publish preview downloads after all three platforms pass their tests.
 
 ```sh
 npm run review                # list pending submissions
@@ -37,7 +37,7 @@ Start the website once before using the review CLI. Website data defaults to `.d
 
 ## Prototype boundaries
 
-No public installers exist yet: the download page says so. Update notifications, rollback controls, resumable downloads, wheel dependency installation, and maintainer authentication are planned. Linux tar.xz installation requires `xz` on PATH. macOS disk images use the built-in `hdiutil` and `ditto` tools. Unsupported OS/architecture combinations show an availability message. Shared add-ons must not write into their own source folder; writable legacy add-ons need a future private-copy mode. Profiles isolate preferences, not the execution of untrusted Python code.
+Releases provide portable archives; setup installers are not available yet. Update notifications, rollback controls, resumable downloads, wheel dependency installation, and maintainer authentication are planned. Linux tar.xz installation requires `xz` on PATH. macOS disk images use the built-in `hdiutil` and `ditto` tools. Unsupported OS/architecture combinations show an availability message. Shared add-ons must not write into their own source folder; writable legacy add-ons need a future private-copy mode. Profiles isolate preferences, not the execution of untrusted Python code.
 
 The website binds to localhost. Do not expose it publicly yet: deployment requires authentication for maintainer tools, rate limiting, spam controls, abuse reporting, ownership verification, and operational hardening. Current catalog approval is editorial review, not a security audit. Source links lead to maintainers; binaries are not mirrored here.
 
@@ -63,3 +63,11 @@ Run `npm run package:mac` on macOS to produce an Apple Silicon `.app` and ZIP un
 The manager scans standard installation locations at startup. On macOS it also detects local Blender/Kitchen build outputs under Documents/Projects. Use Scan installed builds to rescan or Locate existing installation for custom locations. Existing applications are adopted in place. Their native preferences remain untouched; add-on enablement is applied by the startup module without saving over the preferences file. The manager now launches builds with their native preference locations, just like direct launches. Existing copied manager profiles are retained but no longer used for launching.
 
 Uninstall controls confirm the exact application path before moving the application/build to Trash and removing its manager profile. Close the build first. System executables without an isolated application folder must be removed with the OS package manager; the UI explains when it can only remove the manager entry. Uninstalling a shared add-on deletes its library copy and profile links, leaving the original local import source untouched.
+
+## Publishing a preview release
+
+Run `npm test` before tagging. Set `package.json` and `package-lock.json` to the release version, commit, then push a matching tag (for example `v0.1.0`). The Release workflow tests and packages macOS Apple Silicon, Windows x64, and Linux x64. It publishes a GitHub prerelease with archives and SHA-256 checksums only after every platform succeeds. Normal branch pushes do not produce release artifacts.
+
+Use `npm run package` to package the current host platform locally. `npm run package:mac` remains available. Public macOS distribution still needs Developer ID signing and notarization; Windows builds are unsigned.
+
+On macOS, managed installs automatically receive Applications shortcuts. Existing applications are preserved, additional versions get distinct names, and uninstall removes only the matching shortcut. If `/Applications` is not writable, the manager uses `~/Applications`.

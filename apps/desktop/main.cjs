@@ -73,7 +73,7 @@ app.whenReady().then(async () => {
     let lastProgress = 0;
     try {
       const release = await resolveRelease(selected, net.fetch);
-      return await install(release, library, {
+      const installed = await install(release, library, {
         fetcher: net.fetch,
         signal: downloadController.signal,
         onProgress: (progress) => {
@@ -85,6 +85,8 @@ app.whenReady().then(async () => {
             window.webContents.send("install-progress", { id, ...progress });
         },
       });
+      await library.syncApplications();
+      return installed;
     } finally {
       downloadController = null;
     }
@@ -94,8 +96,10 @@ app.whenReady().then(async () => {
   let detection = library.detect();
   handle("library", async () => {
     await detection;
+    const applicationReports = await library.syncApplications();
     const state = await library.syncSharedAddons();
     state.nativeReports = await library.syncNativeAddons();
+    state.applicationReports = applicationReports;
     return state;
   });
   handle("scan-installations", async () => {

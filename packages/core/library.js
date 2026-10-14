@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { addApplication, removeApplication } from "./applications.js";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -174,6 +175,20 @@ export class Library {
     this.syncQueue = job.catch(() => {});
     return job;
   }
+  async syncApplications(options) {
+    const reports = {};
+    await this.update(async (state) => {
+      for (const install of state.installs) {
+        try {
+          const shortcut = await addApplication(install, options);
+          if (shortcut) install.applicationShortcut = shortcut;
+        } catch (error) {
+          reports[install.id] = [error.message];
+        }
+      }
+    });
+    return reports;
+  }
   async detect(roots) {
     const candidates = await detectInstallations(roots);
     return this.update((state) => {
@@ -252,9 +267,10 @@ export class Library {
     return path.join(parent, relative.split(path.sep)[0]);
   }
   async forgetInstall(id) {
-    await this.update((state) => {
+    await this.update(async (state) => {
       const install = state.installs.find((i) => i.id === id);
       if (!install) throw Error("Unknown installation.");
+      await removeApplication(install);
       state.ignoredExecutables ||= [];
       state.ignoredExecutables.push(install.executable);
       state.installs = state.installs.filter((i) => i.id !== id);
