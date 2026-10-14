@@ -1,8 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("manager", {
   catalog: () => ipcRenderer.invoke("catalog"),
-  release: (id) => ipcRenderer.invoke("release", id),
-  install: (id) => ipcRenderer.invoke("install", id),
+  releases: (id, channel) => ipcRenderer.invoke("releases", id, channel),
+  install: (id, url) => ipcRenderer.invoke("install", id, url),
   cancelInstall: () => ipcRenderer.invoke("cancel-install"),
   onProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);

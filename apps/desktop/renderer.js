@@ -128,42 +128,97 @@ window.manager
       const actions = document.createElement("div");
       actions.className = "actions";
       actions.append(button, cancel);
-      card.append(title, detail, actions, progress, message);
+      const channelLabel = document.createElement("label");
+      channelLabel.textContent = "Channel";
+      const channel = document.createElement("select");
+      channel.setAttribute("aria-label", item.name + " channel");
+      for (const value of item.id === "blender"
+        ? ["Stable", "Beta", "Alpha"]
+        : ["All", "Stable", "Pre-release", "Beta", "Alpha"]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        channel.append(option);
+      }
+      channelLabel.append(channel);
+      const versionLabel = document.createElement("label");
+      versionLabel.textContent = "Version";
+      const version = document.createElement("select");
+      version.setAttribute("aria-label", item.name + " version");
+      versionLabel.append(version);
+      card.append(
+        title,
+        channelLabel,
+        versionLabel,
+        detail,
+        actions,
+        progress,
+        message,
+      );
       document.querySelector("#catalog").append(card);
-      const view = { message, progress, button };
+      let list = [],
+        loading = false,
+        failed = false;
+      const selected = () => list.find((r) => r.url === version.value);
+      const update = () => {
+        const release = selected();
+        button.disabled = installing || loading || (!release && !failed);
+        channel.disabled = installing || loading;
+        version.disabled = installing || loading || !list.length;
+        detail.textContent = release
+          ? `${release.channel} · ${release.platform} ${release.arch}${release.channel === "Beta" || release.channel === "Alpha" ? " · Development build" : ""}`
+          : loading
+            ? "Looking up releases…"
+            : failed
+              ? detail.textContent
+              : "No builds published for this channel and computer.";
+      };
+      const view = { message, progress, button, update };
       downloadCards.set(item.id, view);
-      let release;
       const load = async () => {
-        button.disabled = true;
+        loading = true;
+        failed = false;
+        list = [];
+        version.replaceChildren();
+        update();
         try {
-          release = await window.manager.release(item.id);
-          detail.textContent = `${release.version} · ${release.channel} · ${release.platform} ${release.arch}`;
+          list = await window.manager.releases(item.id, channel.value);
+          for (const release of list) {
+            const option = document.createElement("option");
+            option.value = release.url;
+            option.textContent = `${release.version}${release.date ? " · " + release.date : ""} · ${release.channel}`;
+            version.append(option);
+          }
           button.textContent = "Download and install";
         } catch (e) {
+          failed = true;
           detail.textContent = e.message;
           button.textContent = "Retry release lookup";
         } finally {
-          button.disabled = installing;
+          loading = false;
+          update();
         }
       };
+      channel.onchange = () => void load();
+      version.onchange = update;
       cancel.onclick = async () => {
         cancel.disabled = true;
         message.textContent = "Canceling…";
         await window.manager.cancelInstall();
       };
       button.onclick = async () => {
-        if (!release) {
+        if (!selected()) {
           await load();
           return;
         }
         if (installing) return;
         installing = true;
-        for (const v of downloadCards.values()) v.button.disabled = true;
+        for (const v of downloadCards.values()) v.update();
         progress.hidden = false;
         cancel.hidden = false;
         cancel.disabled = false;
         try {
-          await window.manager.install(item.id);
+          await window.manager.install(item.id, selected().url);
           message.textContent = "Installed. Ready to launch from Installed.";
           await refresh();
         } catch (e) {
@@ -172,7 +227,7 @@ window.manager
           installing = false;
           progress.hidden = true;
           cancel.hidden = true;
-          for (const v of downloadCards.values()) v.button.disabled = false;
+          for (const v of downloadCards.values()) v.update();
         }
       };
       void load();

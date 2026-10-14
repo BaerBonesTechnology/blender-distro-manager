@@ -18,7 +18,7 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 ## Working now
 
 - Desktop import and launch of existing installations with separate configuration and scripts directories.
-- Download and install the latest supported official Blender release or Kitchen 3D release for this computer. Kitchen 3D pre-releases are labeled. Downloads verify published SHA-256 checksums, retry up to three times, and install side by side. Cancel stops downloads; extraction finishes before cancellation cleanup.
+- Choose and install Blender stable releases (3.x onward), including previous versions, or available official Beta/Alpha daily builds. Kitchen 3D offers its published release history with channel filters. Only packages matching this computer are listed. Kitchen 3D pre-releases are labeled. Downloads verify published SHA-256 checksums, retry up to three times, and install side by side. Cancel stops downloads; extraction finishes before cancellation cleanup.
 - Three desktop tabs: Installed, Download, and Add-ons. Desktop supports system/light/dark themes; the website uses dark mode.
 - Shared library for pure-Python legacy add-on folders containing `__init__.py`.
 - Explicit per-installation add-on assignment using symlinks, or directory junctions on Windows. Enable the assigned add-on in Blender preferences. Compatibility is currently a manual check.

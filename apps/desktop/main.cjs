@@ -35,23 +35,26 @@ app.whenReady().then(async () => {
     });
   const { catalog } = await import("../../packages/core/catalog.js");
   handle("catalog", () => catalog);
-  const { discover } = await import("../../packages/core/releases.js");
+  const { listReleases, resolveRelease } =
+    await import("../../packages/core/releases.js");
   const { install } = await import("../../packages/core/installer.js");
   const releases = new Map();
   let downloadController;
-  handle("release", async (id) => {
-    const release = await discover(id, { fetcher: net.fetch });
-    releases.set(id, release);
-    return release;
+  handle("releases", async (id, channel) => {
+    const list = await listReleases(id, { fetcher: net.fetch, channel });
+    for (const release of list) releases.set(release.url, release);
+    return list;
   });
-  handle("install", async (id) => {
+  handle("install", async (id, url) => {
     if (downloadController)
       throw Error("An installation is already in progress.");
-    const release = releases.get(id);
-    if (!release) throw Error("Load release information first.");
+    const selected = releases.get(url);
+    if (!selected || selected.id !== id)
+      throw Error("Select a release from the list first.");
     downloadController = new AbortController();
     let lastProgress = 0;
     try {
+      const release = await resolveRelease(selected, net.fetch);
       return await install(release, library, {
         fetcher: net.fetch,
         signal: downloadController.signal,

@@ -190,3 +190,62 @@ test("cancel during download cleans partial bytes", async (t) => {
     [],
   );
 });
+
+test("release history includes older stable versions and resolves selected checksum", async () => {
+  const { listReleases, resolveRelease } =
+    await import("../packages/core/releases.js");
+  const hash = "c".repeat(64);
+  const fetcher = async (url) =>
+    new Response(
+      url.endsWith("/release/")
+        ? '<a href="Blender5.2/">'
+        : url.endsWith("/Blender5.2/")
+          ? '<a href="blender-5.2.2-windows-x64.zip"><a href="blender-5.2.1-windows-x64.zip">blender-5.2.2.sha256 blender-5.2.1.sha256'
+          : `${hash} blender-5.2.1-windows-x64.zip`,
+    );
+  const list = await listReleases("blender", {
+    platform: "win32",
+    arch: "x64",
+    fetcher,
+  });
+  assert.deepEqual(
+    list.map((r) => r.version),
+    ["5.2.2", "5.2.1"],
+  );
+  assert.equal((await resolveRelease(list[1], fetcher)).sha256, hash);
+});
+test("daily channels exclude wrong platform, archive type and channel", async () => {
+  const { listReleases, resolveRelease } =
+    await import("../packages/core/releases.js");
+  const build = {
+    version: "5.4.0",
+    hash: "abc",
+    release_cycle: "alpha",
+    platform: "windows",
+    architecture: "x86_64",
+    file_extension: "zip",
+    file_name: "build.zip",
+    url: "https://cdn.builder.blender.org/build.zip",
+    file_mtime: 1,
+  };
+  const fetcher = async () =>
+    Response.json([
+      build,
+      { ...build, release_cycle: "beta" },
+      { ...build, file_extension: "sha256" },
+      { ...build, architecture: "arm64" },
+    ]);
+  const list = await listReleases("blender", {
+    channel: "Alpha",
+    platform: "win32",
+    arch: "x64",
+    fetcher,
+  });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].channel, "Alpha");
+  assert.equal(
+    (await resolveRelease(list[0], async () => new Response("d".repeat(64))))
+      .sha256,
+    "d".repeat(64),
+  );
+});
