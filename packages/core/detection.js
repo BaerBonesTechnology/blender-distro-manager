@@ -38,14 +38,14 @@ export async function detectInstallations(roots) {
       if (
         e.isDirectory() &&
         /\.(app)$/i.test(e.name) &&
-        /blender|kitchen|blaya/i.test(e.name)
+        /blender|kitchen|blaya|mixar/i.test(e.name)
       ) {
         let binaries = [];
         try {
           binaries = await fs.readdir(path.join(full, "Contents", "MacOS"));
         } catch {}
         const binary = binaries.find((n) =>
-          /^(blender|kitchen ?3d|blaya)$/i.test(n),
+          /^(blender|kitchen ?3d|blaya|mixar)$/i.test(n),
         );
         if (binary)
           candidates.push({
@@ -54,13 +54,16 @@ export async function detectInstallations(roots) {
           });
       } else if (
         e.isDirectory() &&
-        /blender|kitchen|blaya|^bin$|^Blender Foundation$/i.test(e.name)
+        /blender|kitchen|blaya|mixar|^bin$|^Blender Foundation$/i.test(e.name)
       )
         await walk(full, depth + 1);
-      else if (e.isFile() && /^(blender|kitchen3d)(\.exe)?$/i.test(e.name))
+      else if (
+        e.isFile() &&
+        /^(blender|kitchen3d|mixar)(\.exe)?$/i.test(e.name)
+      )
         candidates.push({
           executable: full,
-          uninstallPath: /blender|kitchen/i.test(path.basename(dir))
+          uninstallPath: /blender|kitchen|mixar/i.test(path.basename(dir))
             ? dir
             : null,
         });
@@ -75,18 +78,20 @@ export async function detectInstallations(roots) {
         timeout: 15000,
       });
       const version = stdout.match(
-        /(?:Blender|Kitchen\s*3D)\s+(\d+\.\d+\.\d+)/i,
+        /(?:Blender|Kitchen\s*3D|Mixar)\s+(\d+\.\d+\.\d+)/i,
       )?.[1];
       if (!version) continue;
-      const distro = /kitchen|blaya/i.test(candidate.executable)
-        ? "kitchen3d"
-        : "blender";
+      const distro = /mixar/i.test(candidate.executable)
+        ? "mixar"
+        : /kitchen|blaya/i.test(candidate.executable)
+          ? "kitchen3d"
+          : "blender";
       result.push({
         ...candidate,
         executable,
         version,
         distro,
-        name: `${distro === "blender" ? "Blender" : "Kitchen 3D"} ${version}`,
+        name: `${distro === "mixar" ? "Mixar" : distro === "blender" ? "Blender" : "Kitchen 3D"} ${version}`,
         external: true,
       });
     } catch {}

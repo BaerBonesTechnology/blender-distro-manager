@@ -1,4 +1,12 @@
-const { app, BrowserWindow, ipcMain, dialog, net, shell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  net,
+  shell,
+  Menu,
+} = require("electron");
 const path = require("node:path");
 app.setName("Blender Distro Manager");
 app.setPath(
@@ -10,7 +18,10 @@ let library, window;
 app.whenReady().then(async () => {
   const { Library } = await import("../../packages/core/library.js");
   library = new Library(path.join(app.getPath("userData"), "library"));
+  if (process.platform === "darwin")
+    app.dock.setIcon(path.join(__dirname, "assets", "app-icon.png"));
   window = new BrowserWindow({
+    icon: path.join(__dirname, "assets", "app-icon.png"),
     width: 1150,
     height: 820,
     webPreferences: {
@@ -20,6 +31,32 @@ app.whenReady().then(async () => {
       sandbox: true,
     },
   });
+  const openSettings = () => {
+    if (!window.isDestroyed()) {
+      window.show();
+      window.webContents.send("open-settings");
+    }
+  };
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(process.platform === "darwin" ? [{ role: "appMenu" }] : []),
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "Settings…",
+            accelerator: "CmdOrCtrl+,",
+            click: openSettings,
+          },
+          { type: "separator" },
+          { role: process.platform === "darwin" ? "close" : "quit" },
+        ],
+      },
+      { role: "editMenu" },
+      { role: "viewMenu" },
+      { role: "windowMenu" },
+    ]),
+  );
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (e) => e.preventDefault());
   window.webContents.session.setPermissionRequestHandler(
@@ -34,8 +71,31 @@ app.whenReady().then(async () => {
         throw Error("Unknown sender");
       return fn(...args);
     });
+  handle("settings-info", async () => {
+    const state = await library.read();
+    return {
+      version: require("../../package.json").version,
+      libraryPath: library.root,
+      lastScan: state.discoveryCompletedAt || null,
+    };
+  });
+  handle("open-library-folder", async () => {
+    await require("node:fs/promises").mkdir(library.root, { recursive: true });
+    const error = await shell.openPath(library.root);
+    if (error) throw Error(error);
+  });
   const { catalog } = await import("../../packages/core/catalog.js");
-  handle("catalog", () => catalog);
+  handle("catalog", () =>
+    catalog.map((item) => ({
+      ...item,
+      externalInstaller: item.id === "mixar" && process.platform === "win32",
+    })),
+  );
+  handle("distribution-website", async (id) => {
+    const item = catalog.find((item) => item.id === id);
+    if (!item) throw Error("Unknown distribution.");
+    await shell.openExternal(item.url + (id === "mixar" ? "/releases" : ""));
+  });
   const { listReleases, resolveRelease } =
     await import("../../packages/core/releases.js");
   const { install } = await import("../../packages/core/installer.js");
@@ -93,7 +153,7 @@ app.whenReady().then(async () => {
   });
   handle("cancel-install", () => downloadController?.abort());
   app.on("before-quit", () => downloadController?.abort());
-  let detection = library.detect();
+  let detection = library.initialize();
   handle("library", async () => {
     await detection;
     const applicationReports = await library.syncApplications();
@@ -108,7 +168,7 @@ app.whenReady().then(async () => {
   });
   handle("locate-installation", async () => {
     const choice = await dialog.showOpenDialog(window, {
-      title: "Locate an existing Blender or Kitchen 3D installation",
+      title: "Locate an existing Blender, Kitchen 3D, or Mixar installation",
       properties: ["openDirectory"],
     });
     if (!choice.canceled) {

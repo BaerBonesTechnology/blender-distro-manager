@@ -8,7 +8,8 @@ import { compatible } from "./extensions.js";
 import { detectInstallations } from "./detection.js";
 import { execFile, spawn } from "node:child_process";
 export class Library {
-  constructor(root) {
+  constructor(root, { scanner = detectInstallations } = {}) {
+    this.scanner = scanner;
     this.root = path.resolve(root);
     this.queue = Promise.resolve();
     this.syncQueue = Promise.resolve();
@@ -189,8 +190,26 @@ export class Library {
     });
     return reports;
   }
+  initialize() {
+    this.initialization ||= (async () => {
+      const state = await this.read();
+      if (state.discoveryCompletedAt) return;
+      // Existing libraries already contain the user's saved choices.
+      if (state.installs.length || state.ignoredExecutables?.length) {
+        await this.update((s) => {
+          s.discoveryCompletedAt = new Date().toISOString();
+        });
+        return;
+      }
+      await this.detect();
+    })().catch((error) => {
+      this.initialization = null;
+      throw error;
+    });
+    return this.initialization;
+  }
   async detect(roots) {
-    const candidates = await detectInstallations(roots);
+    const candidates = await this.scanner(roots);
     return this.update((state) => {
       for (const candidate of candidates) {
         if (
@@ -200,6 +219,7 @@ export class Library {
           continue;
         state.installs.push({ ...candidate, id: randomUUID() });
       }
+      state.discoveryCompletedAt = new Date().toISOString();
       return candidates.length;
     });
   }

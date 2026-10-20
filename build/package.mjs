@@ -19,6 +19,14 @@ const outputs = await packager({
   overwrite: true,
   asar: true,
   prune: true,
+  icon: path.resolve(
+    "apps/desktop/assets",
+    platform === "darwin"
+      ? "icon.icns"
+      : platform === "win32"
+        ? "icon.ico"
+        : "app-icon.png",
+  ),
   appBundleId: "org.blenderdistromanager.desktop",
   appCategoryType: "public.app-category.graphics-design",
   ignore: [

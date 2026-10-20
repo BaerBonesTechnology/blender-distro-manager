@@ -197,8 +197,8 @@ async function dmg(file, dest) {
 export async function findExecutable(root, platform) {
   const names =
     platform === "win32"
-      ? ["kitchen3d.exe", "blender.exe"]
-      : ["Kitchen 3D", "kitchen3d", "blender", "Blender"];
+      ? ["mixar.exe", "Mixar.exe", "kitchen3d.exe", "blender.exe"]
+      : ["Mixar", "mixar", "Kitchen 3D", "kitchen3d", "blender", "Blender"];
   const walk = async (dir, depth) => {
     if (depth > 7) return null;
     const entries = await fs.readdir(dir, { withFileTypes: true });

@@ -18,6 +18,7 @@ On macOS, select the executable inside `Blender.app/Contents/MacOS/Blender` (or 
 ## Working now
 
 - Desktop import and launch of existing installations with separate configuration and scripts directories.
+- Mixar is included in the distribution list, with verified official macOS Apple Silicon and Linux x64 packages. Windows links to Mixar’s official MSI installer; use Scan installed builds after installation to adopt it.
 - Choose and install Blender stable releases (3.x onward), including previous versions, or available official Beta/Alpha daily builds. Kitchen 3D offers its published release history with channel filters. Only packages matching this computer are listed. Kitchen 3D pre-releases are labeled. Downloads verify published SHA-256 checksums, retry up to three times, and install side by side. Cancel stops downloads; extraction finishes before cancellation cleanup.
 - Three desktop tabs: Installed, Download, and Add-ons. Desktop supports system/light/dark themes; the website uses dark mode.
 - Search the official Blender Extensions community catalog by name, tags, and maintainer. Install verified extension archives into the shared library. Search shows up to 60 matches; refine the query to find more.
@@ -60,7 +61,7 @@ Run `npm run package:mac` on macOS to produce an Apple Silicon `.app` and ZIP un
 
 ## Existing installations and uninstall
 
-The manager scans standard installation locations at startup. On macOS it also detects local Blender/Kitchen build outputs under Documents/Projects. Use Scan installed builds to rescan or Locate existing installation for custom locations. Existing applications are adopted in place. Their native preferences remain untouched; add-on enablement is applied by the startup module without saving over the preferences file. The manager now launches builds with their native preference locations, just like direct launches. Existing copied manager profiles are retained but no longer used for launching.
+The manager scans standard installation locations once on first use. Installation paths and discovery completion are saved in `library.json` inside the desktop user-data `library/` directory; later launches load this file instead of rescanning. Existing populated libraries migrate without another automatic scan. On macOS it also detects local Blender/Kitchen build outputs under Documents/Projects. Use Scan installed builds to rescan or Locate existing installation for custom locations. Existing applications are adopted in place. Their native preferences remain untouched; add-on enablement is applied by the startup module without saving over the preferences file. The manager now launches builds with their native preference locations, just like direct launches. Existing copied manager profiles are retained but no longer used for launching.
 
 Uninstall controls confirm the exact application path before moving the application/build to Trash and removing its manager profile. Close the build first. System executables without an isolated application folder must be removed with the OS package manager; the UI explains when it can only remove the manager entry. Uninstalling a shared add-on deletes its library copy and profile links, leaving the original local import source untouched.
 

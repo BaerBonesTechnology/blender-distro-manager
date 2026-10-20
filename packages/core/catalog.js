@@ -17,4 +17,13 @@ export const catalog = [
     url: "https://github.com/BaerBonesTechnology/kitchen-3d",
     platforms: ["Windows", "macOS", "Linux"],
   },
+  {
+    id: "mixar",
+    name: "Mixar",
+    category: "Community",
+    description:
+      "A Blender-based 3D suite with an AI agent and layered texture painting.",
+    url: "https://github.com/Mixar-AI/mixar-app",
+    platforms: ["Windows", "macOS", "Linux"],
+  },
 ];

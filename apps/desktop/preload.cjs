@@ -1,5 +1,12 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("manager", {
+  settingsInfo: () => ipcRenderer.invoke("settings-info"),
+  openLibraryFolder: () => ipcRenderer.invoke("open-library-folder"),
+  onOpenSettings: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("open-settings", listener);
+    return () => ipcRenderer.removeListener("open-settings", listener);
+  },
   searchAddons: (query) => ipcRenderer.invoke("search-addons", query),
   installCommunityAddon: (key) =>
     ipcRenderer.invoke("install-community-addon", key),
@@ -9,6 +16,7 @@ contextBridge.exposeInMainWorld("manager", {
     ipcRenderer.invoke("set-addon-enabled", addon, install, enabled),
   removeAddon: (id) => ipcRenderer.invoke("remove-addon", id),
   uninstallBuild: (id) => ipcRenderer.invoke("uninstall-build", id),
+  distributionWebsite: (id) => ipcRenderer.invoke("distribution-website", id),
   catalog: () => ipcRenderer.invoke("catalog"),
   releases: (id, channel) => ipcRenderer.invoke("releases", id, channel),
   install: (id, url) => ipcRenderer.invoke("install", id, url),

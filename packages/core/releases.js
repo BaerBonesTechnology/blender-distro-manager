@@ -16,6 +16,17 @@ export async function discover(
   id,
   { platform = process.platform, arch = process.arch, fetcher = fetch } = {},
 ) {
+  if (id === "mixar") {
+    const releases = await listReleases(id, {
+      platform,
+      arch,
+      fetcher,
+      channel: "All",
+    });
+    if (!releases.length)
+      throw Error("No compatible Mixar archive is available.");
+    return resolveRelease(releases[0], fetcher);
+  }
   const os = { win32: "windows", darwin: "macos", linux: "linux" }[platform];
   if (!os) throw Error("Unsupported operating system.");
   const get = async (url) => {
@@ -213,15 +224,17 @@ export async function listReleases(
         date: new Date(b.file_mtime * 1000).toISOString().slice(0, 10),
       }));
   }
-  if (id === "kitchen3d") {
+  if (id === "kitchen3d" || id === "mixar") {
+    const repo =
+      id === "mixar" ? "Mixar-AI/mixar-app" : "BaerBonesTechnology/kitchen-3d";
     const result = [];
     for (let page = 1; page <= 10; page++) {
       const releases = await (
         await get(
-          `https://api.github.com/repos/BaerBonesTechnology/kitchen-3d/releases?per_page=100&page=${page}`,
+          `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`,
         )
       ).json();
-      const filename = `Kitchen3D-${os}-${arch}.${platform === "linux" ? "tar.xz" : "zip"}`;
+      const kitchenFilename = `Kitchen3D-${os}-${arch}.${platform === "linux" ? "tar.xz" : "zip"}`;
       for (const r of releases.filter((r) => !r.draft)) {
         const label = /alpha/i.test(r.tag_name + " " + r.name)
           ? "Alpha"
@@ -231,14 +244,27 @@ export async function listReleases(
               ? "Pre-release"
               : "Stable";
         if (channel !== "All" && label !== channel) continue;
-        const asset = r.assets.find((a) => a.name === filename);
+        const mixarSuffix =
+          platform === "darwin" && arch === "arm64"
+            ? "-arm64.dmg"
+            : platform === "linux" && arch === "x64"
+              ? "-linux-x86_64.tar.xz"
+              : null;
+        const asset = r.assets.find((a) =>
+          id === "mixar"
+            ? mixarSuffix &&
+              /^Mixar-[0-9]/.test(a.name) &&
+              a.name.endsWith(mixarSuffix)
+            : a.name === kitchenFilename,
+        );
+        const filename = asset?.name;
         if (!asset) continue;
         const sha256 = asset.digest?.match(/^sha256:([a-f0-9]{64})$/i)?.[1];
         const sums = r.assets.find((a) => a.name === filename + ".sha256");
         if (!sha256 && !sums) continue;
         result.push({
           id,
-          name: "Kitchen 3D",
+          name: id === "mixar" ? "Mixar" : "Kitchen 3D",
           version: r.tag_name,
           channel: label,
           filename,

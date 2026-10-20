@@ -13,6 +13,7 @@ document.querySelector("#addon").onclick = () =>
   act(() => window.manager.importAddon());
 async function refresh() {
   const state = await window.manager.read();
+  document.querySelector("#installation-discovery").hidden = state.installs.length > 0;
   for (const key of ["installs", "addons"]) {
     const root = document.querySelector("#" + key);
     root.replaceChildren();
@@ -34,11 +35,11 @@ async function refresh() {
       }
       if (key === "installs") {
         const button = document.createElement("button");
-        button.textContent = "Launch →";
+        button.textContent = "Launch";
         button.onclick = () => act(() => window.manager.launch(item.id));
         const location = document.createElement("p");
         location.className = "small";
-        location.textContent = `${item.external ? "Existing installation" : "Downloaded by manager"} · ${item.executable}`;
+        location.textContent = `${item.external ? "Existing installation" : "Managed installation"}`;
         const remove = document.createElement("button");
         remove.className = "secondary";
         remove.textContent = "Uninstall";
@@ -48,6 +49,14 @@ async function refresh() {
         actions.className = "actions";
         actions.append(button, remove);
         card.append(location, actions);
+        const pathDetails = document.createElement("details");
+        pathDetails.className = "install-path";
+        const pathSummary = document.createElement("summary");
+        pathSummary.textContent = "Show location";
+        const pathText = document.createElement("p");
+        pathText.textContent = item.executable;
+        pathDetails.append(pathSummary, pathText);
+        card.append(pathDetails);
         for (const message of state.applicationReports?.[item.id] || []) {
           const warning = document.createElement("p");
           warning.textContent = message;
@@ -214,6 +223,16 @@ window.manager
         message,
       );
       document.querySelector("#catalog").append(card);
+      if (item.externalInstaller) {
+        detail.textContent =
+          "Mixar provides a Windows MSI installer. Install it, then choose Scan installed builds to add it here.";
+        channelLabel.hidden = versionLabel.hidden = true;
+        button.textContent = "Get official Windows installer";
+        button.disabled = false;
+        button.onclick = () =>
+          act(() => window.manager.distributionWebsite(item.id));
+        continue;
+      }
       let list = [],
         loading = false,
         failed = false;
@@ -380,3 +399,48 @@ document.querySelector("#scan-builds").onclick = () =>
   act(() => window.manager.scanInstallations());
 document.querySelector("#locate-build").onclick = () =>
   act(() => window.manager.locateInstallation());
+
+const settingsDialog = document.querySelector("#settings");
+const settingsStatus = document.querySelector("#settings-status");
+async function loadSettings() {
+  const info = await window.manager.settingsInfo();
+  document.querySelector("#library-location").textContent = info.libraryPath;
+  document.querySelector("#app-version").textContent =
+    `Version ${info.version}`;
+  document.querySelector("#last-scan").textContent = info.lastScan
+    ? `Last discovery: ${new Date(info.lastScan).toLocaleString()}`
+    : "Initial discovery has not completed yet.";
+}
+async function openSettings() {
+  if (!settingsDialog.open) settingsDialog.showModal();
+  settingsStatus.textContent = "";
+  try {
+    await loadSettings();
+  } catch (error) {
+    settingsStatus.textContent = error.message;
+  }
+}
+document.querySelector("#open-settings").onclick = openSettings;
+window.manager.onOpenSettings(openSettings);
+document.querySelector("#open-library").onclick = async () => {
+  try {
+    await window.manager.openLibraryFolder();
+  } catch (error) {
+    settingsStatus.textContent = error.message;
+  }
+};
+document.querySelector("#settings-scan").onclick = async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  settingsStatus.textContent = "Scanning installations…";
+  try {
+    await window.manager.scanInstallations();
+    await refresh();
+    await loadSettings();
+    settingsStatus.textContent = "Scan complete. Installation locations saved.";
+  } catch (error) {
+    settingsStatus.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
